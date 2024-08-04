@@ -18,11 +18,21 @@
 
 </div>
 
-A simple tool for correctly renaming Unreal Engine Projects, while ensuring no data loss, corruption or other jank.
+A simple tool for correctly renaming Unreal Engine projects while ensuring no data loss, corruption, or other issues.
+
+## Features
+* User-Friendly Interface: Simple, guided command prompt usage.
+* Compatibility: Supports both Blueprint and C++ projects.
+* Versatile: Compatible with Unreal Engine 4 (UE4) and Unreal Engine 5 (UE5).
+* Smart Detection: Automatically detects project names, modules, target files, config files, and more.
+* Automatic Backup: Backs up all modified files to ensure data safety.
+* Multi-Rename Support: Handles multiple project renames seamlessly.
+* Visual Studio Integration: Automatically generates Visual Studio project files.
+* Comprehensive Updates: Updates .uproject modules and files, target files, source folders, all source files, all config files, and .sln files.
+* Optional Cleanup: Offers optional cleaning of project cache folders to maintain a clean workspace.
 
 ## Installation
-
-Simply download the latest release from [here](https://github.com/Corvo2408/UnrealEngineProjectRenamer/releases) and place the .exe file anywhere.
+Download the latest release from [here](https://github.com/Corvo2408/UnrealEngineProjectRenamer/releases) and place the .exe file anywhere on your system.
 
 ## Usage
-Simplest way to use this tool, is to double click UnrealEngineProjectRenamer.exe. From there you can follow the in-console instructions.
+To use this tool, simply double-click UnrealEngineProjectRenamer.exe and follow the in-console instructions.
