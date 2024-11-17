@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <conio.h>
+#include <windows.h>
 #include <set>
 #include "globals.h"
 
@@ -57,6 +58,27 @@ void BackupFile(const fs::path& filePath)
     {
         SetConsoleColour(COLOUR_RED);
         std::cerr << "\nERROR: File " << filePath << " does not exist." << std::endl;
+        SetConsoleColour(COLOUR_WHITE);
+    }
+}
+
+void MakeFileWritable(const std::filesystem::path& filePath)
+{
+    try
+    {
+        auto perms = std::filesystem::status(filePath).permissions();
+        if ((perms & std::filesystem::perms::owner_write) == std::filesystem::perms::none)
+        {
+            // Add write permission
+            std::filesystem::permissions(filePath,
+                perms | std::filesystem::perms::owner_write,
+                std::filesystem::perm_options::add);
+        }
+    }
+    catch (const std::exception& e)
+    {
+        SetConsoleColour(COLOUR_RED);
+        std::cerr << "\nFailed to modify file permissions: " << e.what() << std::endl;
         SetConsoleColour(COLOUR_WHITE);
     }
 }
@@ -283,6 +305,7 @@ void SetNewProjectName()
 // Set Uproject Module Name
 void SetUprojectModuleName()
 {
+    MakeFileWritable(oldUprojectFilePath);
     BackupFile(oldUprojectFilePath);
 
     if (isCPPProject)
@@ -404,6 +427,8 @@ void EditTargetFiles()
                 oldName = filename.substr(0, filename.size() - 16);
                 newFilePath = sourceDirectory / (newProjectName + "Editor.Target.cs");
 
+                MakeFileWritable(entry.path());
+
                 // Backup the file
                 BackupFile(entry.path());
 
@@ -434,6 +459,8 @@ void EditTargetFiles()
                 targetFileFound = true;
                 oldName = filename.substr(0, filename.size() - 10);
                 newFilePath = sourceDirectory / (newProjectName + ".Target.cs");
+
+                MakeFileWritable(entry.path());
 
                 // Backup the file
                 BackupFile(entry.path());
@@ -500,6 +527,8 @@ void EditSourceFolder()
                 {
                     if (entry.is_regular_file() && entry.path().extension() == ".h")
                     {
+                        MakeFileWritable(entry.path());
+
                         std::string filename = entry.path().filename().string();
 
                         // Read and modify the .h file
@@ -551,6 +580,7 @@ void EditSourceFolder()
                         if (filename.size() > 9 && filename.substr(filename.size() - 9) == ".Build.cs")
                         {
                             buildFileFound = true;
+                            MakeFileWritable(entry.path());
 
                             // Read and modify the .Build.cs file
                             std::ifstream buildFile(entry.path());
@@ -598,6 +628,7 @@ void EditSourceFolder()
                         if (filename == userCPPSourceName + ".cpp")
                         {
                             cppFileFound = true;
+                            MakeFileWritable(entry.path());
 
                             // Read and modify the .cpp file
                             std::ifstream cppFile(entry.path());
@@ -625,6 +656,8 @@ void EditSourceFolder()
                         if (filename == userCPPSourceName + ".h")
                         {
                             headerFileFound = true;
+
+                            MakeFileWritable(entry.path());
 
                             // Rename the .h file
                             fs::path newHeaderFilePath = folderPath / (newProjectName + ".h");
@@ -697,6 +730,8 @@ void EditConfigFiles()
         if (entry.is_regular_file())
         {
             // Backup the file
+            MakeFileWritable(entry.path());
+
             BackupFile(entry.path());
 
             std::string filename = entry.path().filename().string();
@@ -723,6 +758,8 @@ void EditConfigFiles()
     // Specific logic for DefaultEngine.ini
     if (fs::exists(defaultEngineIniPath))
     {
+        MakeFileWritable(defaultEngineIniPath);
+
         std::ifstream configFile(defaultEngineIniPath);
         std::stringstream buffer;
         buffer << configFile.rdbuf();
@@ -991,6 +1028,67 @@ void GenerateVisualStudioProjectFiles()
     }
 }
 
+void RenameProjectFolder()
+{
+    bool success = false;
+
+    while (!success)
+    {
+        try
+        {
+            // Set the current path as the old path
+            fs::path oldFolderPath = projectRootDirectory;
+
+            // Get the parent path of the old directory
+            fs::path parentPath = oldFolderPath.parent_path();
+
+            // Create the new path by combining the parent path with the new name
+            fs::path newFolderPath = parentPath / newProjectName;
+
+            // Convert paths to wstring for Windows API
+            std::wstring oldPath = oldFolderPath.wstring(); // Explicit conversion
+            std::wstring newPath = newFolderPath.wstring(); // Explicit conversion
+
+            // Attempt to rename with MoveFileEx
+            if (MoveFileEx(oldPath.c_str(), newPath.c_str(), MOVEFILE_REPLACE_EXISTING))
+            {
+                SetConsoleColour(COLOUR_GREEN);
+                std::cout << "\nSuccessfully renamed folder from:\n" << oldFolderPath << "\nTo:\n" << newFolderPath << std::endl;
+                SetConsoleColour(COLOUR_WHITE);
+                success = true;
+            }
+            else
+            {
+                DWORD dwError = GetLastError();
+                if (dwError == ERROR_ACCESS_DENIED)  // Error 5 means access denied
+                {
+                    SetConsoleColour(COLOUR_RED);
+                    std::cout << "Failed to rename folder. Error code: " << dwError << std::endl;
+                    std::cout << "Please ensure all instances of this folder are closed (including File Explorer), and then press any key to retry..." << std::endl;
+                    SetConsoleColour(COLOUR_WHITE);
+                    // Wait for user to press a key to retry
+                    _getch(); // Waits for a key press
+                    std::cout << "Retrying...\n";
+                }
+                else
+                {
+                    SetConsoleColour(COLOUR_RED);
+                    std::cout << "Failed to rename folder. Error code: " << dwError << std::endl;
+                    SetConsoleColour(COLOUR_WHITE);
+                    break;
+                }
+            }
+        }
+        catch (const std::exception& e)
+        {
+            SetConsoleColour(COLOUR_RED);
+            std::cout << "Exception: " << e.what() << std::endl;
+            SetConsoleColour(COLOUR_WHITE);
+            break;
+        }
+    }
+}
+
 
 int main()
 {
@@ -1007,7 +1105,7 @@ int main()
     DeleteCachedProjectDirectories();
     DeleteSlnFiles();
     GenerateVisualStudioProjectFiles();
-
+    RenameProjectFolder();
     SetConsoleColour(COLOUR_GREEN);
     std::cout << "\nSuccessfully completed Unreal Engine project rename" << std::endl;
     SetConsoleColour(COLOUR_ORANGE);
